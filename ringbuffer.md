@@ -39,22 +39,25 @@ b:segments() -> iter() -> start, len  segment iterator
 b:data() -> buf                       data buffer (Lua table, cdata array, etc.)
 ------------------------------------- ------------------------------------------------
 
-__Note:__ pop() and shift() are complementary: passing a negative count
-to one results in the behavior of the other.
-
-### Callback-based buffers
-
-Callback-based buffers rely on callbacks to do all the memory allocation,
-reading and writing. They only provide the ring buffer mechanism and the API.
-Adding data results in multiple calls to _write(). Removing data results in
-multiple calls to _read(). Indices start at 1.
+__Note:__ pop() and shift() are complementary: passing a negative length
+to pop() results in a shift() and viceversa.
 
 ### CData buffers
 
-Probably the most useful, cdata buffers keep an array of cdata values.
-Writing data writes to the buffer. Removing data results in multiple calls
-to _readbytes().
+Probably the most useful, cdata buffers keep an array of cdata values
+of the same size. Pushing data writes it to the buffer. Removing data
+adjusts the buffer's length and start index and results in multiple
+calls to _readdata().
 
 ### Value buffers
 
 Value buffers hold arbitrary Lua values in a fixed-size table.
+For simplicity, values can only be added and removed one by one.
+
+### Callback-based buffers
+
+Callback-based buffers rely on callbacks to do all the reading and writing
+and memory allocation. They only provide the logic and the API. Creating
+a buffer results in a call to _init(). Adding data results in multiple
+calls to _write(). Removing data results in multiple calls to _read().
+Indices start at 1.
