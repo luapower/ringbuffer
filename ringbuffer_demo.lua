@@ -22,11 +22,11 @@ for i = 1, 1000 do
 	if n > 0 then
 		b:push(randstr(n), n)
 	elseif n < 0 then
-		b:pop(n * (rand() > .5 and 1 or -1), function() end)
+		b:pop(n * (rand() > .4 and 1 or -1), function() end)
 	end
 
-	local i1, n1 = b:next_range()
-	local i2, n2 = b:next_range(i1)
+	local i1, n1 = b:next_segment()
+	local i2, n2 = b:next_segment(i1)
 	local s = ffi.string(b._data, b:size())
 	if n2 then
 		print(s:sub(1, n2)..(' '):rep(b:size() - n1 - n2)..s:sub(i1, i1 + n1 - 1), ...)
