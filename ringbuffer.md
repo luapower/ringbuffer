@@ -13,9 +13,9 @@ and can hold different kinds of values:
 
 ## API
 
-------------------------------------- --------------------------------------------
+------------------------------------- ------------------------------------------------
 __cdata buffers__
-rb.cdatabuffer(size[, ctype]) -> cb   create a cdata buffer (ctype = 'char')
+rb.cdatabuffer(size[, ctype]) -> cb   create a cdata buffer (default ctype is 'char')
 cb:push(data, len)                    add data to the tail of the buffer
 cb:shift(len)                         remove data from the head of the buffer
 cb:pop(len)                           remove data from the tail of the buffer
@@ -37,7 +37,7 @@ b:length() -> n                       buffer occupied size
 b:isempty() -> true | false           check if empty
 b:isfull() -> true | false            check if full
 b:segments() -> iter() -> start, len  segment iterator
-------------------------------------- --------------------------------------------
+------------------------------------- ------------------------------------------------
 
 __Note:__ pop() and shift() are complementary: passing a negative count
 to one results in the behavior of the other.
