@@ -51,7 +51,7 @@ calls to _readdata().
 
 ### Value buffers
 
-Value buffers hold arbitrary Lua values in a fixed-size table.
+Value buffers hold arbitrary Lua values (nils included) in a fixed-size table.
 For simplicity, values can only be added and removed one by one.
 
 ### Callback-based buffers
