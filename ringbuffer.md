@@ -16,16 +16,15 @@ and can hold different kinds of values:
 ------------------------------------- ------------------------------------------------
 __cdata buffers__
 rb.cdatabuffer(size[, ctype]) -> cb   create a cdata buffer (default ctype is 'char')
-cb:push(data, len)                    add data to the tail of the buffer
-cb:shift(len)                         remove data from the head of the buffer
-cb:pop(len)                           remove data from the tail of the buffer
-cb:_readbytes(ptr, len)               called when removing data
+cb:push(data[, len])                  add data to the tail of the buffer
+cb:shift([len])                       remove data from the head of the buffer
+cb:pop([len])                         remove data from the tail of the buffer
+cb:_readdata(ptr, len)                called when removing data
 __value buffers__
 rb.valuebuffer(size) -> vb            create a buffer of arbitrary Lua values
-vb:push(...)                          add values to the tail of the buffer
-vb:shift([count]) -> v1, ...          remove values from the head of the buffer
-vb:pop([count]) -> v1, ...            remove values from the tail of the buffer
-vb:_readvalue(val)                    called when removing values
+vb:push(val)                          add a value to the tail of the buffer
+vb:shift() -> val                     remove a value from the head of the buffer
+vb:pop() -> val                       remove a value from the tail of the buffer
 __callback-based buffers__
 rb.buffer:new(size) -> b              create a buffer
 b:_init()                             constructor
@@ -37,6 +36,7 @@ b:length() -> n                       buffer occupied size
 b:isempty() -> true | false           check if empty
 b:isfull() -> true | false            check if full
 b:segments() -> iter() -> start, len  segment iterator
+b:data() -> buf                       data buffer (Lua table, cdata array, etc.)
 ------------------------------------- ------------------------------------------------
 
 __Note:__ pop() and shift() are complementary: passing a negative count

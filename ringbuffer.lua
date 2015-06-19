@@ -2,6 +2,8 @@
 -- FIFO/LIFO Ring Buffers.
 -- Written by Cosmin Apreutesei. Public Domain.
 
+if not ... then require'ringbuffer_test'; return end
+
 local min, max, abs = math.min, math.max, math.abs
 
 --normalize an index if it exceeds buffer size up to twice-1
@@ -26,7 +28,10 @@ local function segments(start, length, size)
 	end
 end
 
+--callback-based buffer
+
 local rb = {}
+setmetatable(rb, rb)
 
 --stubs
 function rb:_init() end
@@ -39,6 +44,7 @@ function rb:new(size, ...)
 	rb:_init(...)
 	return rb
 end
+rb.__call = rb.new
 
 function rb:size() return self._size end
 function rb:length() return self._length end
@@ -57,6 +63,8 @@ end
 function rb:segments() --return iterator() -> start, length
 	return rb.next_segment, self
 end
+
+function rb:data() return self._data end --stub
 
 --push data into the buffer, which triggers 1 or 2 writes.
 function rb:push(data, length)
@@ -78,7 +86,7 @@ end
 
 --shift or pop data from the buffer, which triggers 1 or 2 reads.
 function rb:shift(length)
-	length = length or -1
+	length = length or 1
 	assert(abs(length) <= self._length, 'buffer underflow')
 	if length > 0 then --remove from head
 		local i1, n1, i2, n2 = segments(self._start, length, self._size)
@@ -103,14 +111,18 @@ function rb:shift(length)
 end
 
 function rb:pop(length, ...)
-	return self:shift(-length, ...)
+	return self:shift(-(length or 1), ...)
+end
+
+function rb:peek(start)
+
 end
 
 --cdata buffer
 
-local ffi
+local ffi --init at runtime for Lua5.1 compatiblity
 
-local cb = setmetatable({}, {__index = rb})
+local cb = setmetatable({}, {__index = rb, __call = rb.new})
 
 function cb:_init(ctype)
 	ffi = ffi or require'ffi'
@@ -126,87 +138,50 @@ function cb:_write(start, length, data, data_start)
 			length)
 end
 
-function cb:_readbytes(data, length) end --stub
+function cb:_readdata(data, length) end --stub
 
 function cb:_read(start)
-	self._readbytes(ffi.cast(self._ptype, self._data) + start - 1, length)
+	self._readdata(ffi.cast(self._ptype, self._data) + start - 1, length)
 end
 
 --value buffer
 
-local vb = setmetatable({}, {__index = rb})
+local vb = setmetatable({}, {__index = rb, __call = rb.new})
 
 function vb:_init()
 	self._data = {}
 end
 
-function vb:_write(offset, length, data, data_offset)
-	for i = 0, length-1, length > 0 and 1 or -1 do
-		self._data[offset+i] = data[data_offset+i]
-	end
+function vb:_write(start, length, data, data_start)
+	self._data[start] = data
 end
 
-function vb:_read(offset, length)
-	local sign = length > 0 and 1 or -1
-	for i = offset, offset + length - sign, sign do
-		self._readvalue(self._data[i])
-		self._data[i] = false --keep the TValues
-	end
+function vb:_read(start, length)
+	self._val = self._data[start]
+	self._data[start] = false --keep the TValue
 end
 
-function vb:shift(length, readvalue)
-	self._readvalue = readvalue
-	rb.shift(self, length)
+function vb:push(val) --no length arg
+	rb.push(self, val)
 end
 
---unit test
+function vb:shift()
+	rb.shift(self, 1)
+	local val = self._val
+	self._val = nil
+	return val
+end
 
-if not ... then
-	local ffi = require'ffi'
-	local time = require'time'
-
-	--test algorithm
-	print(segments(1, 5, 10))
-	print(segments(6, 5, 10))
-	print(segments(1, 10, 10))
-	print(segments(10, -5, 10))
-	print(segments(6, -5, 10))
-	print(segments(10, -10, 10))
-	print(segments(6, 10, 10))  --right overflow
-	print(segments(5, -10, 10)) --left overflow
-
-	local b = rb:new(10)
-	assert(b:size() == 10)
-	function b:_write(...) print('write', ...) end
-	function b:_read(...) print('read', ...) end
-	local function _(i,j)
-		assert(b._start == i)
-		assert((b._start + b._length - 1) % b._size == j)
-	end
-	for i,n in b:segments() do
-		assert(false) --should have no segments
-	end
-	b:push('', 3) _(1,3)
-	b:push('', 5) _(1,8)
-	b:shift(3)    _(4,8)
-	b:pop(3)      _(4,5)
-	b:push('', 3) _(4,8)
-	b:push('', 5) _(4,3) --(right overflow)
-	b:shift(2)    _(6,3)
-	b:pop(4)      _(6,9) --(left underflow)
-	b:push('', 6) _(6,5) --(right overflow)
-	assert(b:length() == 10)
-	b:shift(8)    _(4,5) --(right underflow)
-	assert(b:length() == 2)
-	b:push('', 8) _(4,3) --(right overflow)
-	for i,n in b:segments() do
-		print('segment: ', i, n)
-	end
+function vb:pop()
+	rb.shift(self, -1)
+	local val = self._val
+	self._val = nil
+	return val
 end
 
 return {
+	segments    = segments,
 	buffer      = rb,
 	cdatabuffer = cb,
 	valuebuffer = vb,
 }
-

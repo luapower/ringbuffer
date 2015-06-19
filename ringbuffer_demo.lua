@@ -1,4 +1,3 @@
-
 local rb = require'ringbuffer'
 local ffi = require'ffi'
 local rand = math.random
@@ -27,7 +26,7 @@ for i = 1, 1000 do
 
 	local i1, n1 = b:next_segment()
 	local i2, n2 = b:next_segment(i1)
-	local s = ffi.string(b._data, b:size())
+	local s = ffi.string(b:data(), b:size())
 	if n2 then
 		print(s:sub(1, n2)..(' '):rep(b:size() - n1 - n2)..s:sub(i1, i1 + n1 - 1), ...)
 	elseif n1 then
