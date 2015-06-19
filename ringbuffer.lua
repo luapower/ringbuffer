@@ -105,32 +105,32 @@ function rb:pop(length, ...)
 	return self:unshift(-length, ...)
 end
 
---block buffer
+--cdata buffer
 
 local ffi
 
-local bb = setmetatable({}, {__index = rb})
-rb.bytebuffer = bb
+local cb = setmetatable({}, {__index = rb})
+rb.cdatabuffer = cb
 
-function bb:_init(ctype)
-	ffi = require'ffi'
+function cb:_init(ctype)
+	ffi = ffi or require'ffi'
 	local ctype = ffi.typeof(ctype or 'char')
 	self._data = ffi.new(ffi.typeof('$[?]', ctype), self:size())
 	self._ptype = ffi.typeof('$*', ctype)
 end
 
-function bb:_write(offset, length, data, data_offset)
+function cb:_write(offset, length, data, data_offset)
 	ffi.copy(
 			ffi.cast(self._ptype, self._data) + offset - 1,
 			ffi.cast(self._ptype, data) + data_offset - 1,
 			length)
 end
 
-function bb:_read(offset, length)
+function cb:_read(offset, length)
 	self._readbytes(ffi.cast(self._ptype, self._data) + offset, length)
 end
 
-function bb:unshift(length, readbytes)
+function cb:unshift(length, readbytes)
 	self._readbytes = readbytes
 	rb.unshift(self, length)
 end
@@ -138,6 +138,7 @@ end
 --value buffer
 
 local vb = setmetatable({}, {__index = rb})
+rb.valuebuffer = vb
 
 function vb:_init()
 	self._data = {}
@@ -186,7 +187,6 @@ if not ... then
 	b:unshift(2) --4,2
 	b:unshift(4) --4,8 (underflow)
 	assert(b:length(4))
-
 end
 
 return rb

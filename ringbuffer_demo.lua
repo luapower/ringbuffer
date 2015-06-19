@@ -3,15 +3,17 @@ local rb = require'ringbuffer'
 local ffi = require'ffi'
 local rand = math.random
 
-local b = rb.bytebuffer:new(78)
+local b = rb.cdatabuffer:new(78)
 
 local function randstr(n)
 	return string.char(rand(('A'):byte(), ('Z'):byte())):rep(n)
 end
 
+math.randomseed(os.time())
+
 for i = 1, 1000 do
 
-	local n = math.floor(rand(-b:length(), b:size() - b:length()) / rand(8))
+	local n = math.floor(rand(-b:length(), b:size() - b:length()) / rand(16))
 	if rand() > 0.9 then --hit full
 		n = b:size() - b:length()
 	elseif rand() < 0.1 then --hit empty
