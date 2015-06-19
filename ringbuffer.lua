@@ -1,5 +1,5 @@
 
--- FIFO and LIFO ring buffer.
+-- FIFO/LIFO ring buffer.
 -- Written by Cosmin Apreutesei. Public Domain.
 
 local min, max, abs = math.min, math.max, math.abs
@@ -9,12 +9,12 @@ local rb = {}
 --stubs
 function rb:_init() end
 function rb:_read(offset, length) end
-function rb:_write(offset, length, data, offset) end
+function rb:_write(offset, length, data, data_offset) end
 
-function rb:new(size)
+function rb:new(size, ...)
 	local rb = {_size = size, _start = 1, _length = 0}
 	setmetatable(rb, {__index = self})
-	rb:_init()
+	rb:_init(...)
 	return rb
 end
 
@@ -41,6 +41,20 @@ end
 local function ranges_neg(start, length, size)
 	local length1 = -start
 	return start, max(length, length1), size, min(0, length - length1)
+end
+
+function rb:next_range(i0)
+	if self._length == 0 then return end -- no ranges
+	local i1, n1, i2, n2 = ranges_poz(self._start, self._length, self._size)
+	if not i0 then --first range
+		return i1, n1
+	elseif n2 ~= 0 then --second range, if any
+		return i2, n2
+	end
+end
+
+function rb:ranges() --return iterator() -> index, length
+	return rb.next_range, self
 end
 
 --push data into the buffer, which triggers 1 or 2 writes.
@@ -87,8 +101,64 @@ function rb:unshift(length)
 	end
 end
 
-function rb:pop(length)
-	return self:unshift(-length)
+function rb:pop(length, ...)
+	return self:unshift(-length, ...)
+end
+
+--block buffer
+
+local ffi
+
+local bb = setmetatable({}, {__index = rb})
+rb.bytebuffer = bb
+
+function bb:_init(ctype)
+	ffi = require'ffi'
+	local ctype = ffi.typeof(ctype or 'char')
+	self._data = ffi.new(ffi.typeof('$[?]', ctype), self:size())
+	self._ptype = ffi.typeof('$*', ctype)
+end
+
+function bb:_write(offset, length, data, data_offset)
+	ffi.copy(
+			ffi.cast(self._ptype, self._data) + offset - 1,
+			ffi.cast(self._ptype, data) + data_offset - 1,
+			length)
+end
+
+function bb:_read(offset, length)
+	self._readbytes(ffi.cast(self._ptype, self._data) + offset, length)
+end
+
+function bb:unshift(length, readbytes)
+	self._readbytes = readbytes
+	rb.unshift(self, length)
+end
+
+--value buffer
+
+local vb = setmetatable({}, {__index = rb})
+
+function vb:_init()
+	self._data = {}
+end
+
+function vb:_write(offset, length, data, data_offset)
+	for i = 0, length-1, length > 0 and 1 or -1 do
+		self._data[offset+i] = data[data_offset+i]
+	end
+end
+
+function vb:_read(offset, length)
+	local sign = length > 0 and 1 or -1
+	for i = offset, offset + length - sign, sign do
+		self._readvalue(self._data[i])
+	end
+end
+
+function vb:unshift(length, readvalue)
+	self._readvalue = readvalue
+	rb.unshift(self, length)
 end
 
 --unit test
@@ -117,43 +187,6 @@ if not ... then
 	b:unshift(4) --4,8 (underflow)
 	assert(b:length(4))
 
-	local rand = math.random
-	local b = rb:new(100)
-	b._data = ffi.new('char[?]', b:size())
-	function b:_write(offset, length, data, data_offset)
-		--print('write', offset, length, data, data_offset)
-		ffi.copy(ffi.cast('char*', self._data) + offset - 1, ffi.cast('char*', data) + data_offset - 1, length)
-	end
-	function b:_read(offset, length)
-		--
-	end
-	function rands(n)
-		return string.char(rand(('A'):byte(), ('Z'):byte())):rep(n)
-	end
-	function b:print(...)
-		local i1, n1, i2, n2 = ranges_poz(self._start, self._length, self._size)
-		local s = ffi.string(self._data, self._size)
-		if n2 == 0 then
-			print((' '):rep(i1 - 1)..s:sub(i1, i1 + n1 - 1)..(' '):rep(self._size - n1 - i1 - 1), ...)
-		else
-			print(s:sub(1, n2)..(' '):rep(self._size - n1 - n2)..s:sub(i1, i1 + n1 - 1), ...)
-		end
-		--print(s:sub(i1, i1 + n1 - 1)..s:sub(i2, i2 + n2 - 1))
-	end
-	for i = 1, 200 do
-		local n = math.floor(rand(-b:length(), b:size() - b:length())) / 3
-		if n > 0 then
-			b:push(rands(n), n)
-		elseif n < 0 then
-			b:pop(n * (rand() > .5 and 1 or -1))
-		end
-		print((' '):rep(b:size()))
-		io.stdout:write'\x1b[1A' -- up one line
-		b:print()
-		io.stdout:write'\x1b[1A'
-		time.sleep(0.02)
-	end
-	print()
 end
 
 return rb
