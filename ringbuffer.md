@@ -5,26 +5,15 @@ tagline: FIFO/LIFO Ring Buffers
 ## `local rb = require'ringbuffer'`
 
 Fixed-size ring buffers that can be used as queues (FIFO) or stacks (LIFO)
-and come with 3 different APIs:
+and can hold different kinds of values:
 
-  * callback-based buffers for extending and customizing
   * cdata buffers for fixed-size cdata values
   * value buffers for arbitrary Lua values
+  * callback-based buffers for extending and customizing
 
 ## API
 
 ------------------------------------- --------------------------------------------
-__common__                            common functions
-b:size() -> n                         buffer size
-b:length() -> n                       buffer occupied size
-b:isempty() -> true | false           check if empty
-b:isfull() -> true | false            check if full
-b:segments() -> iter() -> start, len  segment iterator
-__callback-based buffers__
-rb.buffer:new(size) -> b              create a buffer
-b:_init()                             constructor
-b:_write(start, len, data, dstart)    called when adding data
-b:_read(start, len)                   called when removing data
 __cdata buffers__
 rb.cdatabuffer(size[, ctype]) -> cb   create a cdata buffer (ctype = 'char')
 cb:push(data, len)                    add data to the tail of the buffer
@@ -37,6 +26,17 @@ vb:push(...)                          add values to the tail of the buffer
 vb:shift([count]) -> v1, ...          remove values from the head of the buffer
 vb:pop([count]) -> v1, ...            remove values from the tail of the buffer
 vb:_readvalue(val)                    called when removing values
+__callback-based buffers__
+rb.buffer:new(size) -> b              create a buffer
+b:_init()                             constructor
+b:_write(start, len, data, dstart)    called when adding data
+b:_read(start, len)                   called when removing data
+__common API__
+b:size() -> n                         buffer size
+b:length() -> n                       buffer occupied size
+b:isempty() -> true | false           check if empty
+b:isfull() -> true | false            check if full
+b:segments() -> iter() -> start, len  segment iterator
 ------------------------------------- --------------------------------------------
 
 __Note:__ pop() and shift() are complementary: passing a negative count
