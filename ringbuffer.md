@@ -38,24 +38,26 @@ b:isfull() -> true | false               check if full
 b:segments() -> iter() -> start, len     segment iterator
 ---------------------------------------- ------------------------------------------------
 
-__Note:__ `pop()` and `shift()` are complementary: passing a negative length
+## API Notes
+
+  * `pop()` and `shift()` are complementary: passing a negative length
 to pop() results in a shift() and viceversa.
+  * ndices `start` and `datastart` count from 1.
+  * the value buffer can be used with plain Lua (ffi is loaded on demand)
 
-__Note:__ Indices `start` and `datastart` count from 1.
-
-### CData buffers
+## CData buffers
 
 Probably the most useful, cdata buffers keep an array of cdata values
 of the same size. Pushing data writes it to the buffer. Removing data
 adjusts the buffer's length and start index and results in multiple
 calls to a supplied `read(ctype_ptr, len)` function.
 
-### Value buffers
+## Value buffers
 
 Value buffers hold arbitrary Lua values (nils included) in a table.
 For simplicity, values can only be added and removed one by one.
 
-### Callback-based buffers
+## Callback-based buffers
 
 Callback-based buffers rely on callbacks to do all the reading and writing.
 They only provide the ring buffer logic and the API. Adding data results
