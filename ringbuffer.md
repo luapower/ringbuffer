@@ -19,11 +19,13 @@ rb.cdatabuffer(size, ctype, read) -> db  create a buffer for specific cdata valu
 db:push(data[, len])                     add data to the tail of the buffer
 db:shift([len])                          remove data from the head of the buffer
 db:pop([len])                            remove data from the tail of the buffer
+db:data() -> buf                         the buffer (use with segments())
 __value buffers__
 rb.valuebuffer(size) -> vb               create a buffer for arbitrary Lua values
 vb:push(val)                             add a value to the tail of the buffer
 vb:shift() -> val                        remove a value from the head of the buffer
 vb:pop() -> val                          remove a value from the tail of the buffer
+vb:values() -> t                         the buffer (use with segments())
 __callback-based buffers__
 rb.callbackbuffer(size) -> cb            create a callback buffer
 cb:write(start, len, data, datastart)    callback: called when adding data
@@ -34,7 +36,6 @@ b:length() -> n                          buffer occupied size
 b:isempty() -> true | false              check if empty
 b:isfull() -> true | false               check if full
 b:segments() -> iter() -> start, len     segment iterator
-b:data() -> buf                          data buffer (Lua table, cdata array, etc.)
 ---------------------------------------- ------------------------------------------------
 
 __Note:__ `pop()` and `shift()` are complementary: passing a negative length

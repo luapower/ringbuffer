@@ -145,16 +145,16 @@ local function cdatabuffer(size, ctype, readdata)
 end
 
 local function valuebuffer(size)
-	local val --upvalue for data transfer
-	local buf = {}
+	local val    --upvalue for data transfer
+	local t = {} --the ring buffer is a simple array
 
 	local b = bufferfactory(function(size)
 		local function read(start)
-			val = buf[start]
-			buf[start] = false --keep the table slot occupied
+			val = t[start]
+			t[start] = false --keep the table slot occupied
 		end
 		local function write(start, _, data)
-			buf[start] = data
+			t[start] = data
 		end
 		return read, write
 	end)(size)
@@ -170,7 +170,7 @@ local function valuebuffer(size)
 	end
 	function b:shift() return shift(1) end
 	function b:pop() return shift(-1) end
-	function b:data() return buf end
+	function b:values() return t end
 
 	return b
 end
