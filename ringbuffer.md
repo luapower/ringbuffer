@@ -7,57 +7,56 @@ tagline: FIFO/LIFO Ring Buffers
 Fixed-size ring buffers that can be used as queues (FIFO) or stacks (LIFO)
 and can hold different kinds of values:
 
-  * cdata buffers for fixed-size cdata values
-  * value buffers for arbitrary Lua values
-  * callback-based buffers for extending and customizing
+  * cdata buffers which hold cdata values of the same type
+  * value buffers which hold arbitrary Lua values
+  * callback buffers for callback-based I/O
 
 ## API
 
-------------------------------------- ------------------------------------------------
+---------------------------------------- ------------------------------------------------
 __cdata buffers__
-rb.cdatabuffer(size[, ctype]) -> cb   create a cdata buffer (default ctype is 'char')
-cb:push(data[, len])                  add data to the tail of the buffer
-cb:shift([len])                       remove data from the head of the buffer
-cb:pop([len])                         remove data from the tail of the buffer
-cb:_readdata(ptr, len)                called when removing data
+rb.cdatabuffer(size, ctype, read) -> db  create a buffer for specific cdata values
+db:push(data[, len])                     add data to the tail of the buffer
+db:shift([len])                          remove data from the head of the buffer
+db:pop([len])                            remove data from the tail of the buffer
 __value buffers__
-rb.valuebuffer(size) -> vb            create a buffer of arbitrary Lua values
-vb:push(val)                          add a value to the tail of the buffer
-vb:shift() -> val                     remove a value from the head of the buffer
-vb:pop() -> val                       remove a value from the tail of the buffer
+rb.valuebuffer(size) -> vb               create a buffer for arbitrary Lua values
+vb:push(val)                             add a value to the tail of the buffer
+vb:shift() -> val                        remove a value from the head of the buffer
+vb:pop() -> val                          remove a value from the tail of the buffer
 __callback-based buffers__
-rb.buffer:new(size) -> b              create a buffer
-b:_init()                             constructor
-b:_write(start, len, data, dstart)    called when adding data
-b:_read(start, len)                   called when removing data
+rb.callbackbuffer(size) -> cb            create a callback buffer
+cb:write(start, len, data, datastart)    callback: called when adding data
+cb:read(start, len)                      callback: called when removing data
 __common API__
-b:size() -> n                         buffer size
-b:length() -> n                       buffer occupied size
-b:isempty() -> true | false           check if empty
-b:isfull() -> true | false            check if full
-b:segments() -> iter() -> start, len  segment iterator
-b:data() -> buf                       data buffer (Lua table, cdata array, etc.)
-------------------------------------- ------------------------------------------------
+b:size() -> n                            buffer size
+b:length() -> n                          buffer occupied size
+b:isempty() -> true | false              check if empty
+b:isfull() -> true | false               check if full
+b:segments() -> iter() -> start, len     segment iterator
+b:data() -> buf                          data buffer (Lua table, cdata array, etc.)
+---------------------------------------- ------------------------------------------------
 
-__Note:__ pop() and shift() are complementary: passing a negative length
+__Note:__ `pop()` and `shift()` are complementary: passing a negative length
 to pop() results in a shift() and viceversa.
+
+__Note:__ Indices `start` and `datastart` count from 1.
 
 ### CData buffers
 
 Probably the most useful, cdata buffers keep an array of cdata values
 of the same size. Pushing data writes it to the buffer. Removing data
 adjusts the buffer's length and start index and results in multiple
-calls to _readdata().
+calls to a supplied `read(ctype_ptr, len)` function.
 
 ### Value buffers
 
-Value buffers hold arbitrary Lua values (nils included) in a fixed-size table.
+Value buffers hold arbitrary Lua values (nils included) in a table.
 For simplicity, values can only be added and removed one by one.
 
 ### Callback-based buffers
 
-Callback-based buffers rely on callbacks to do all the reading and writing
-and memory allocation. They only provide the logic and the API. Creating
-a buffer results in a call to _init(). Adding data results in multiple
-calls to _write(). Removing data results in multiple calls to _read().
-Indices start at 1.
+Callback-based buffers rely on callbacks to do all the reading and writing.
+They only provide the ring buffer logic and the API. Adding data results
+in multiple calls to `self:write()`. Removing data results in multiple calls
+to `self:read()`.

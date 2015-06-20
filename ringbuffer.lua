@@ -4,7 +4,7 @@
 
 if not ... then require'ringbuffer_test'; return end
 
-local min, max, abs = math.min, math.max, math.abs
+local assert, min, max, abs = assert, math.min, math.max, math.abs
 
 --normalize an index if it exceeds buffer size up to twice-1
 local function normalize(i, size)
@@ -28,160 +28,157 @@ local function segments(start, length, size)
 	end
 end
 
---callback-based buffer
+--abstract buffer factory: provides the ring buffer logic only and relies
+--on a constructor to provide the read() and write() functions for I/O.
+local function bufferfactory(cons)
+	return function(size)
+		local start = 1
+		local length = 0
+		local read, write = cons(size)
+		local rb = {}
 
-local rb = {}
-setmetatable(rb, rb)
+		function rb:size() return size end
+		function rb:length() return length end
+		function rb:isfull() return length == size end
+		function rb:isempty() return length == 0 end
 
---stubs
-function rb:_init() end
-function rb:_read(start, length) end
-function rb:_write(start, length, data, data_start) end
+		function rb:next_segment(i0)
+			local i1, n1, i2, n2 = segments(start, length, size)
+			if not i0 and n1 ~= 0 then --first segment, if any
+				return i1, n1
+			elseif i0 == i1 and n2 ~= 0 then --second segment, if any
+				return i2, n2
+			end
+		end
 
-function rb:new(size, ...)
-	local rb = {_size = size, _start = 1, _length = 0}
-	setmetatable(rb, {__index = self})
-	rb:_init(...)
-	return rb
-end
-rb.__call = rb.new
+		function rb:segments() --return iterator() -> start, length
+			return rb.next_segment, self
+		end
 
-function rb:size() return self._size end
-function rb:length() return self._length end
-function rb:isfull() return self._length == self._size end
-function rb:isempty() return self._length == 0 end
+		--push data into the buffer, which triggers 1 or 2 writes.
+		function rb:push(data, len)
+			len = len or 1
+			assert(abs(len) <= size - length, 'buffer overflow')
+			if len > 0 then
+				local start = normalize(start + length, size)
+				local i1, n1, i2, n2 = segments(start, len, size)
+				write(i1, n1, data, 1)
+				length = length + n1
+				if n2 ~= 0 then
+					write(i2, n2, data, 1 + n1)
+					length = length + n2
+				end
+			else
+				assert(false, 'invalid length') --can only push to tail
+			end
+		end
 
-function rb:next_segment(i0)
-	local i1, n1, i2, n2 = segments(self._start, self._length, self._size)
-	if not i0 and n1 ~= 0 then --first segment, if any
-		return i1, n1
-	elseif i0 == i1 and n2 ~= 0 then --second segment, if any
-		return i2, n2
+		--shift or pop data from the buffer, which triggers 0, 1 or 2 reads.
+		function rb:shift(len)
+			len = len or 1
+			assert(abs(len) <= length, 'buffer underflow')
+			if len > 0 then --remove from head
+				local i1, n1, i2, n2 = segments(start, len, size)
+				read(i1, n1)
+				start = normalize(i1 + n1, size)
+				length = length - n1
+				if n2 ~= 0 then
+					read(i2, n2)
+					start = normalize(i2 + n2, size)
+					length = length - n2
+				end
+			elseif len < 0 then --remove from tail
+				local start = normalize(start + length - 1, size)
+				local i1, n1, i2, n2 = segments(start, len, size)
+				read(i1, n1)
+				length = length + n1 --n1 is negative
+				if n2 ~= 0 then
+					read(i2, n2)
+					length = length + n2 --n2 is negative
+				end
+			end
+		end
+
+		function rb:pop(len, ...)
+			return rb:shift(-(len or 1), ...)
+		end
+
+		return rb
 	end
 end
 
-function rb:segments() --return iterator() -> start, length
-	return rb.next_segment, self
-end
-
-function rb:data() return self._data end --stub
-
---push data into the buffer, which triggers 1 or 2 writes.
-function rb:push(data, length)
-	length = length or 1
-	assert(abs(length) <= self._size - self._length, 'buffer overflow')
-	if length > 0 then
-		local start = normalize(self._start + self._length, self._size)
-		local i1, n1, i2, n2 = segments(start, length, self._size)
-		self:_write(i1, n1, data, 1)
-		self._length = self._length + n1
-		if n2 ~= 0 then
-			self:_write(i2, n2, data, 1 + n1)
-			self._length = self._length + n2
+--callback buffer: relies on self:_read() and self:_write() methods.
+local function callbackbuffer(size)
+	local b
+	b = bufferfactory(function(size)
+		local function read(...)
+			return b:read(...)
 		end
-	else
-		assert(false, 'invalid length') --can only push to tail
-	end
-end
-
---shift or pop data from the buffer, which triggers 1 or 2 reads.
-function rb:shift(length)
-	length = length or 1
-	assert(abs(length) <= self._length, 'buffer underflow')
-	if length > 0 then --remove from head
-		local i1, n1, i2, n2 = segments(self._start, length, self._size)
-		self:_read(i1, n1)
-		self._start = normalize(i1 + n1, self._size)
-		self._length = self._length - n1
-		if n2 ~= 0 then
-			self:_read(i2, n2)
-			self._start = normalize(i2 + n2, self._size)
-			self._length = self._length - n2
+		local function write(...)
+			return b:write(...)
 		end
-	elseif length < 0 then --remove from tail
-		local start = normalize(self._start + self._length - 1, self._size)
-		local i1, n1, i2, n2 = segments(start, length, self._size)
-		self:_read(i1, n1)
-		self._length = self._length + n1 --n1 is negative
-		if n2 ~= 0 then
-			self:_read(i2, n2)
-			self._length = self._length + n2 --n2 is negative
-		end
-	end
+		return read, write
+	end)(size)
+	return b
 end
 
-function rb:pop(length, ...)
-	return self:shift(-(length or 1), ...)
-end
+local ffi --init on demand so that the module can be used without luajit
 
-function rb:peek(start)
-
-end
-
---cdata buffer
-
-local ffi --init at runtime for Lua5.1 compatiblity
-
-local cb = setmetatable({}, {__index = rb, __call = rb.new})
-
-function cb:_init(ctype)
+local function cdatabuffer(size, ctype, readdata)
 	ffi = ffi or require'ffi'
-	local ctype = ffi.typeof(ctype or 'char')
-	self._data = ffi.new(ffi.typeof('$[?]', ctype), self:size())
-	self._ptype = ffi.typeof('$*', ctype)
+	local copy, cast = ffi.copy, ffi.cast
+	local ctype = ffi.typeof(ctype)
+	local ptype = ffi.typeof('$*', ctype)
+	local buf   = ffi.new(ffi.typeof('$[?]', ctype), size)
+	local pbuf  = cast(ptype, buf)
+	local b = bufferfactory(function(size)
+		local function read(start, len)
+			readdata(pbuf + (start - 1), len)
+		end
+		local function write(start, len, data, datastart)
+			copy(pbuf + (start - 1), cast(ptype, data) + (datastart - 1), len)
+		end
+		return read, write
+	end)(size)
+	function b:data() return buf end --pin it!
+	return b
 end
 
-function cb:_write(start, length, data, data_start)
-	ffi.copy(
-			ffi.cast(self._ptype, self._data) + start - 1,
-			ffi.cast(self._ptype, data) + data_start - 1,
-			length)
-end
+local function valuebuffer(size)
+	local val --upvalue for data transfer
+	local buf = {}
 
-function cb:_readdata(data, length) end --stub
+	local b = bufferfactory(function(size)
+		local function read(start)
+			val = buf[start]
+			buf[start] = false --keep the table slot occupied
+		end
+		local function write(start, _, data)
+			buf[start] = data
+		end
+		return read, write
+	end)(size)
 
-function cb:_read(start)
-	self._readdata(ffi.cast(self._ptype, self._data) + start - 1, length)
-end
+	--methods
+	local bpush, bshift = b.push, b.shift
+	function b:push(val) bpush(self, val) end
+	local function shift(len)
+		bshift(self, len)
+		local v = val
+		val = nil --unpin it
+		return v
+	end
+	function b:shift() return shift(1) end
+	function b:pop() return shift(-1) end
+	function b:data() return buf end
 
---value buffer
-
-local vb = setmetatable({}, {__index = rb, __call = rb.new})
-
-function vb:_init()
-	self._data = {}
-end
-
-function vb:_write(start, length, data, data_start)
-	self._data[start] = data
-end
-
-function vb:_read(start, length)
-	self._val = self._data[start]
-	self._data[start] = false --keep the TValue
-end
-
-function vb:push(val) --no length arg
-	rb.push(self, val)
-end
-
-function vb:shift()
-	rb.shift(self, 1)
-	local val = self._val
-	self._val = nil
-	return val
-end
-
-function vb:pop()
-	rb.shift(self, -1)
-	local val = self._val
-	self._val = nil
-	return val
+	return b
 end
 
 return {
-	segments    = segments,
-	buffer      = rb,
-	cdatabuffer = cb,
-	valuebuffer = vb,
+	segments       = segments,
+	bufferfactory  = bufferfactory,
+	callbackbuffer = callbackbuffer,
+	cdatabuffer    = cdatabuffer,
+	valuebuffer    = valuebuffer,
 }

@@ -19,7 +19,7 @@ _(6,  5, 1, 5, rb.segments(6, 10, 10))  --right overflow
 _(5, -5,10,-5, rb.segments(5, -10, 10)) --left overflow
 
 --test API
-local b = rb.buffer(10)
+local b = rb.callbackbuffer(10)
 assert(b:length() == 0)
 assert(b:isempty())
 assert(b:size() == 10)
@@ -28,11 +28,11 @@ for i,n in b:segments() do
 end
 
 --test state
-function b:_write(...) print('write', ...) end
-function b:_read(...) print('read', ...) end
+function b:write(...) print('write', ...) end
+function b:read(...) print('read', ...) end
 local function _(i,j)
-	assert(b._start == i)
-	assert((b._start + b._length - 1) % b._size == j)
+	assert(b:next_segment() == i)
+	assert((b:next_segment() + b:length() - 1) % b:size() == j)
 end
 b:push('', 3) _(1,3)
 b:push('', 5) _(1,8)
