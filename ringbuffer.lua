@@ -1,184 +1,181 @@
 
--- FIFO/LIFO Ring Buffers.
+-- FIFO/LIFO ring buffers represented as (start, length, size) tuples.
 -- Written by Cosmin Apreutesei. Public Domain.
 
 if not ... then require'ringbuffer_test'; return end
 
+local ffi --init on demand so that the module can be used without luajit
 local assert, min, max, abs = assert, math.min, math.max, math.abs
 
---normalize an index if it exceeds buffer size up to twice-1
-local function normalize(i, size)
-	return i > size and i - size or i
+--stateless ring buffer algorithm (counts from 1!)
+
+local function normalize(i, size) --normalize i over (1, size) range
+	return (i - 1) % size + 1 --NOTE: '%' is slow. try a while-inc/dec loop?
 end
 
 --the heart of the algorithm: sweep an arbitrary arc over a circle, returning
 --one or two of the normalized arcs that map the input arc to the circle.
---the buffer segment (start, length) is the arc in the model, and a buffer
+--the buffer segment (start, length) is the arc in this model, and a buffer
 --ring (1, size) is the circle. `start` must be normalized to (1, size).
 --`length` can be positive or negative and can't exceed `size`. the second
---output segment can have zero length, which means there's only one segment.
---the first output segment can have zero length too if `length` is zero.
+--output segment will have zero length if there's only one segment.
+--the first output segment will have zero length if input length is zero.
 local function segments(start, length, size)
 	if length > 0 then
 		local length1 = size + 1 - start
 		return start, min(length, length1), 1, max(0, length - length1)
-	else --negative length: map the input segment backwards from `start`
+	else --zero or negative length: map the input segment backwards from `start`
 		local length1 = -start
 		return start, max(length, length1), size, min(0, length - length1)
 	end
 end
 
---abstract buffer factory: provides the ring buffer logic only and relies
---on a constructor to provide the read() and write() functions for I/O.
-local function bufferfactory(cons)
-	return function(size)
-		local start = 1
-		local length = 0
-		local read, write = cons(size)
-		local rb = {}
+local function head(offset, start, length, size) --offset from head
+	return normalize(start + offset, size)
+end
 
-		function rb:size() return size end
-		function rb:length() return length end
-		function rb:isfull() return length == size end
-		function rb:isempty() return length == 0 end
+local function tail(offset, start, length, size) --offset from tail+1
+	return normalize(start + length + offset, size)
+end
 
-		function rb:next_segment(i0)
-			local i1, n1, i2, n2 = segments(start, length, size)
-			if not i0 and n1 ~= 0 then --first segment, if any
-				return i1, n1
-			elseif i0 == i1 and n2 ~= 0 then --second segment, if any
-				return i2, n2
-			end
-		end
+local function offset(offset, start, length, size) --offset from head or tail+1
+	return offset < 0
+		and tail(offset, start, length, size)
+		 or head(offset, start, length, size)
+end
 
-		function rb:segments() --return iterator() -> start, length
-			return rb.next_segment, self
-		end
-
-		--push data into the buffer, which triggers 1 or 2 writes.
-		function rb:push(data, len)
-			len = len or 1
-			assert(abs(len) <= size - length, 'buffer overflow')
-			if len > 0 then
-				local start = normalize(start + length, size)
-				local i1, n1, i2, n2 = segments(start, len, size)
-				write(i1, n1, data, 1)
-				length = length + n1
-				if n2 ~= 0 then
-					write(i2, n2, data, 1 + n1)
-					length = length + n2
-				end
-			else
-				assert(false, 'invalid length') --can only push to tail
-			end
-		end
-
-		--shift or pop data from the buffer, which triggers 0, 1 or 2 reads.
-		function rb:shift(len)
-			len = len or 1
-			assert(abs(len) <= length, 'buffer underflow')
-			if len > 0 then --remove from head
-				local i1, n1, i2, n2 = segments(start, len, size)
-				read(i1, n1)
-				start = normalize(i1 + n1, size)
-				length = length - n1
-				if n2 ~= 0 then
-					read(i2, n2)
-					start = normalize(i2 + n2, size)
-					length = length - n2
-				end
-			elseif len < 0 then --remove from tail
-				local start = normalize(start + length - 1, size)
-				local i1, n1, i2, n2 = segments(start, len, size)
-				read(i1, n1)
-				length = length + n1 --n1 is negative
-				if n2 ~= 0 then
-					read(i2, n2)
-					length = length + n2 --n2 is negative
-				end
-			end
-		end
-
-		function rb:pop(len, ...)
-			return rb:shift(-(len or 1), ...)
-		end
-
-		return rb
+local function push(len, start, length, size)
+	assert(abs(len) <= size - length, 'buffer overflow')
+	if len > 0 then --add len to tail
+		local pushstart = tail(0, start, length, size)
+		local i1, n1, i2, n2 = segments(pushstart, len, size)
+		local newlength = length + n1 + n2
+		return start, newlength, i1, n1, i2, n2
+	elseif len < 0 then --add len to head
+		local i1, n1, i2, n2 = segments(start, len, size)
+		local newstart = head(len, start, length, size)
+		local newlength = length - n1 - n2 --n1 and n2 are negative!
+		return newstart, newlength, i1, n1, i2, n2
+	else
+		return start, length, 1, 0, 1, 0
 	end
 end
 
---callback buffer: relies on self:_read() and self:_write() methods.
-local function callbackbuffer(size)
-	local b
-	b = bufferfactory(function(size)
-		local function read(...)
-			return b:read(...)
-		end
-		local function write(...)
-			return b:write(...)
-		end
-		return read, write
-	end)(size)
-	return b
+local function pull(len, start, length, size)
+	assert(abs(len) <= length, 'buffer underflow')
+	if len > 0 then --remove len from head
+		local i1, n1, i2, n2 = segments(start, len, size)
+		local newstart = head(len, start, length, size)
+		local newlength = length - n1 - n2
+		return newstart, newlength, i1, n1, i2, n2
+	elseif len < 0 then --remove len from tail
+		local tail = tail(-1, start, length, size)
+		local i1, n1, i2, n2 = segments(tail, len, size)
+		local newlength = length + n1 + n2 --n1 and n2 are negative!
+		return start, newlength, i1, n1, i2, n2
+	else
+		return start, length, 1, 0, 1, 0
+	end
 end
 
-local ffi --init on demand so that the module can be used without luajit
-
-local function cdatabuffer(size, ctype, readdata)
+local function cdatabuffer(b) --ring buffer for uniform cdata values
 	ffi = ffi or require'ffi'
-	local copy, cast = ffi.copy, ffi.cast
-	local ctype = ffi.typeof(ctype)
-	local ptype = ffi.typeof('$*', ctype)
-	local buf   = ffi.new(ffi.typeof('$[?]', ctype), size)
-	local pbuf  = cast(ptype, buf)
-	local b = bufferfactory(function(size)
-		local function read(start, len)
-			readdata(pbuf + (start - 1), len)
+	b = b or {}
+	assert(b.size, 'size expected')
+	assert(b.data or b.ctype, 'data or ctype expected')
+	b.start = b.start or 0
+	b.length = b.length or 0 --assume empty
+	assert(b.length >= 0 and b.length <= b.size, 'invalid length')
+	b.data = b.data or ffi.new(ffi.typeof('$[?]', ffi.typeof(b.ctype)), b.size)
+
+	local function normalize_segs(i1, n1, i2, n2)
+		if n1 < 0 then --invert direction of negative-size segments
+			i1, n1 = i1 + n1 + 1, -n1
+			i2, n2 = i2 + n2 + 1, -n2
 		end
-		local function write(start, len, data, datastart)
-			copy(pbuf + (start - 1), cast(ptype, data) + (datastart - 1), len)
+		return i1 - 1, n1, i2 - 1, n2 --count from 0
+	end
+
+	function b:push(data, len)
+		len = len or 1
+		local start, length, i1, n1, i2, n2 = push(len, b.start + 1, b.length, b.size)
+		b.start, b.length = start - 1, length --count from 0
+		i1, n1, i2, n2 = normalize_segs(i1, n1, i2, n2)
+		ffi.copy(b.data + i1, data,            n1)
+		ffi.copy(b.data + i2, data + (n1 - 1), n2)
+		return i1, n1, i2, n2
+	end
+
+	function b:pull(len, keep)
+		len = len or 1
+		local start, length, i1, n1, i2, n2 = pull(len, b.start + 1, b.length, b.size)
+		if keep ~= 'keep' then
+			b.start, b.length = start - 1, length --count from 0
 		end
-		return read, write
-	end)(size)
-	function b:data() return buf end --pin it!
+		i1, n1, i2, n2 = normalize_segs(i1, n1, i2, n2)
+		if b.read then
+			if n1 ~= 0 then b:read(b.data + i1, n1) end
+			if n2 ~= 0 then b:read(b.data + i2, n2) end
+		end
+		return i1, n1, i2, n2
+	end
+
+	function b:offset(ofs)
+		return offset(ofs or 0, b.start + 1, b.length, b.size) - 1
+	end
+
 	return b
 end
 
-local function valuebuffer(size)
-	local val    --upvalue for data transfer
-	local t = {} --the ring buffer is a simple array
+local function valuebuffer(b) --ring buffer for arbitrary Lua values
+	b = b or {}
+	b.data = b.data or {}
+	b.start = b.start or 1
+	b.length = b.length or 0 --assume empty
+	b.size = b.size or #b.data
+	assert(b.length >= 0 and b.length <= b.size, 'invalid length')
 
-	local b = bufferfactory(function(size)
-		local function read(start)
-			val = t[start]
-			t[start] = false --keep the table slot occupied
-		end
-		local function write(start, _, data)
-			t[start] = data
-		end
-		return read, write
-	end)(size)
-
-	--methods
-	local bpush, bshift = b.push, b.shift
-	function b:push(val) bpush(self, val) end
-	local function shift(len)
-		bshift(self, len)
-		local v = val
-		val = nil --unpin it
-		return v
+	local function checksign(sign)
+		sign = sign or 1
+		assert(abs(sign) == 1, 'invalid sign')
+		return sign
 	end
-	function b:shift() return shift(1) end
-	function b:pop() return shift(-1) end
-	function b:values() return t end
+
+	function b:push(val, sign)
+		sign = checksign(sign)
+		local i
+		b.start, b.length, i = push(sign, b.start, b.length, b.size)
+		b.data[i] = val
+		return i
+	end
+
+	function b:pull(sign, keep)
+		sign = checksign(sign)
+		local start, length, i = pull(sign, b.start, b.length, b.size)
+		local val = b.data[i]
+		if keep ~= 'keep' then
+			b.start, b.length = start, length
+			b.data[i] = false --remove the value but keep the slot
+		end
+		return val, i
+	end
+
+	function b:offset(ofs)
+		return offset(ofs or 0, b.start, b.length, b.size)
+	end
 
 	return b
 end
 
 return {
-	segments       = segments,
-	bufferfactory  = bufferfactory,
-	callbackbuffer = callbackbuffer,
-	cdatabuffer    = cdatabuffer,
-	valuebuffer    = valuebuffer,
+	--algorithm
+	segments = segments,
+	head     = head,
+	tail     = tail,
+	offset   = offset,
+	push     = push,
+	pull     = pull,
+	--buffers
+	cdatabuffer = cdatabuffer,
+	valuebuffer = valuebuffer,
 }
