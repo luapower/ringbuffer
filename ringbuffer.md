@@ -5,9 +5,9 @@ tagline: ring buffers
 ## `local rb = require'ringbuffer'`
 
 The ring buffer algorithm is provided as an API operating on an abstract
-buffer state defined as the tuple `(start, length, size)` where start is
-in `[1, size]` interval and length is in `[0, size]` interval. Two actual
-data structures are implemented with this API:
+buffer state defined as the tuple `(start, length, size)` where `start` is
+in the `[1, size]` interval and `length` is in the `[0, size]` interval.
+Two actual data structures are implemented with this API:
 
   * a cdata array buffer, which supports adding/removing elements in bulk.
   * a Lua array buffer, which can hold arbitrary Lua values.
