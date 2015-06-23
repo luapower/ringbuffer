@@ -23,7 +23,7 @@ __NOTE:__ This module can be used with plain Lua but cdatabuffer won't work.
 
 -------------------------------------------- -----------------------------------------------------
 __algorithm__
-rb.segments(start, length, size) \           buffer segments (only one segment if n2 is 0) \
+rb.segments(start, length, size) \           buffer segments (n2 can be 0) \
 	-> i1, n1, i2, n2
 rb.head(ofs, start, length, size) -> i       index at offset from head
 rb.tail(ofs, start, length, size) -> i       index at offset from tail+1
