@@ -26,7 +26,9 @@ local function _(i, j)
 	assert((db.start + db.length - 1) % db.size == j - 1)
 end
 local function nstr(n)
-	return ffi.new('char[?]', n), n
+	local b = ffi.new('char[?]', n)
+	for i=0,n-1 do b[i] = string.byte('A')+i end
+	return b, n
 end
 db:push(nstr(3)) _(1,3)
 db:push(nstr(5)) _(1,8)
@@ -44,6 +46,18 @@ db:push(nstr(8)) _(4,3) --(right overflow)
 db:pull(0) --nop
 db:push(nstr(1), 0) --nop
 assert(db.length == 10)
+assert(not pcall(db.push, db, nstr(1)))
+--test auto-grow
+local backup = ffi.new('char[?]', db.length)
+for i=0,db.length-1 do
+	backup[i] = db.data[db:offset(i)]
+end
+db.autogrow = true
+local len = db.length
+db:push(nstr(5)) _(1,15) --auto-grown
+for i=0,len-1 do
+	assert(db.data[db:offset(i)] == backup[i])
+end
 
 --test value buffer
 local vb = rb.valuebuffer{size = 10}
@@ -66,3 +80,13 @@ assert(vb:pull() == nil)
 local nan = vb:pull(-1)
 assert(nan ~= nan)
 assert(vb.length == 0)
+--test auto-grow
+local function cat(t, sz)
+	local dt = {}
+	for i=1,sz do dt[i] = t[i] or '.' end
+	return table.concat(dt)
+end
+vb = rb.valuebuffer{size = 4, data = {'d', 'a', 'b', 'c'}, start = 2, length = 4, autogrow = true}
+vb:push'e'; assert(cat(vb.data, vb.size) == '.abcde..') --auto-grown; segment 2 moved
+vb = rb.valuebuffer{size = 4, data = {'b', 'c', 'd', 'a'}, start = 4, length = 4, autogrow = true}
+vb:push'e'; assert(cat(vb.data, vb.size) == 'bcde...a') --auto-grown; segment 1 moved

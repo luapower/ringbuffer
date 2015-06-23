@@ -82,11 +82,16 @@ local function cdatabuffer(b) --ring buffer for uniform cdata values
 	ffi = ffi or require'ffi'
 	b = b or {}
 	assert(b.size, 'size expected')
+	assert(b.size >= 1, 'invalid size')
 	assert(b.data or b.ctype, 'data or ctype expected')
 	b.start = b.start or 0
 	b.length = b.length or 0 --assume empty
 	assert(b.length >= 0 and b.length <= b.size, 'invalid length')
-	b.data = b.data or ffi.new(ffi.typeof('$[?]', ffi.typeof(b.ctype)), b.size)
+	assert(not b.autogrow or b.alloc or b.ctype, 'need alloc or ctype for autogrow')
+	b.alloc = b.alloc or function(self, size)
+		return ffi.new(ffi.typeof('$[?]', ffi.typeof(b.ctype)), b.size)
+	end
+	b.data = b.data or b:alloc(b.size)
 
 	local function normalize_segs(i1, n1, i2, n2)
 		if n1 < 0 then --invert direction of negative-size segments
@@ -98,6 +103,14 @@ local function cdatabuffer(b) --ring buffer for uniform cdata values
 
 	function b:push(data, len)
 		len = len or 1
+		if b.autogrow and b.length == b.size then
+			local i1, n1, i2, n2 = normalize_segs(segments(b.start + 1, b.length, b.size))
+			local newsize = b.size * 2
+			local newdata = b:alloc(newsize)
+			ffi.copy(newdata,      b.data + i1, n1)
+			ffi.copy(newdata + n1, b.data + i2, n2)
+			b.data, b.size, b.start = newdata, newsize, 0
+		end
 		local start, length, i1, n1, i2, n2 = push(len, b.start + 1, b.length, b.size)
 		b.start, b.length = start - 1, length --count from 0
 		i1, n1, i2, n2 = normalize_segs(i1, n1, i2, n2)
@@ -132,7 +145,8 @@ local function valuebuffer(b) --ring buffer for arbitrary Lua values
 	b.data = b.data or {}
 	b.start = b.start or 1
 	b.length = b.length or 0 --assume empty
-	b.size = b.size or #b.data
+	assert(b.size, 'size expected')
+	assert(b.size >= 1, 'invalid size')
 	assert(b.length >= 0 and b.length <= b.size, 'invalid length')
 
 	local function checksign(sign)
@@ -143,6 +157,25 @@ local function valuebuffer(b) --ring buffer for arbitrary Lua values
 
 	function b:push(val, sign)
 		sign = checksign(sign)
+		if b.autogrow and b.length == b.size then
+			local newsize = b.size * 2
+			local i1, n1, i2, n2 = segments(b.start, b.length, b.size)
+			if n1 > n2 then --move segment 2 right after segment 1
+				local o = i1 + n1 - 1
+				for i = 1, n2 do
+					b.data[o + i] = b.data[i]
+					b.data[i] = false --keep the slot
+				end
+			else --move segment 1 to the end of the new buffer
+				local o = newsize - n1 + 1
+				for i = 0, n1-1 do
+					b.data[o + i] = b.data[i1 + i]
+					b.data[i1 + i] = false --keep the slot
+				end
+				b.start = o
+			end
+			b.size = newsize
+		end
 		local i
 		b.start, b.length, i = push(sign, b.start, b.length, b.size)
 		b.data[i] = val
