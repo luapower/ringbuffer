@@ -54,7 +54,7 @@ for i=0,db.length-1 do
 end
 db.autogrow = true
 local len = db.length
-db:push(nstr(5)) _(1,15) --auto-grown
+db:push(nstr(15)) _(1,25) --auto-grown
 for i=0,len-1 do
 	assert(db.data[db:offset(i)] == backup[i])
 end

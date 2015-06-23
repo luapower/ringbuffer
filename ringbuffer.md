@@ -5,8 +5,9 @@ tagline: ring buffers
 ## `local rb = require'ringbuffer'`
 
 The ring buffer algorithm is provided as an API operating on an abstract
-buffer state defined as the tuple `(start, length, size)`. Two actual data
-structures are implemented with this API:
+buffer state defined as the tuple `(start, length, size)` where start is
+in `[1, size]` interval and length is in `[0, size]` interval. Two actual
+data structures are implemented with this API:
 
   * a cdata array buffer, which supports adding/removing elements in bulk.
   * a Lua array buffer, which can hold arbitrary Lua values.
@@ -39,13 +40,15 @@ db:pull([len][, 'keep']) -> i1, n1, i2, n2   remove data from head (or tail if l
 db:read(ptr, len)                            callback for reading segments
 db:offset([ofs]) -> i                        get index at head+ofs (or tail+1+ofs if ofs < 0)
 db.data -> cdata                             the buffer itself
-db:alloc(size) -> cdata                      optional custom allocator
+db:alloc(len) -> cdata                       optional custom allocator
+db:checksize(len)                            grow the buffer to fit at least `len` more elements
 __value buffers__
 rb.valuebuffer(vb) -> vb                     create a buffer for arbitrary Lua values
 vb:push(val[, sign]) -> i                    add value to tail (or head if sign = -1)
 vb:pull([sign][, 'keep']) -> val, i          remove value from head (or tail if sign = -1)
 vb:offset([ofs]) -> i                        get index at head+ofs (or tail+1+ofs if ofs < 0)
 vb.data -> t                                 the buffer itself
+vb:checksize(len)                            grow the buffer to fit at least `len` more elements
 __buffer state__
 b.start -> i                                 start index
 b.size -> n                                  buffer size

@@ -89,7 +89,7 @@ local function cdatabuffer(b) --ring buffer for uniform cdata values
 	assert(b.length >= 0 and b.length <= b.size, 'invalid length')
 	assert(not b.autogrow or b.alloc or b.ctype, 'need alloc or ctype for autogrow')
 	b.alloc = b.alloc or function(self, size)
-		return ffi.new(ffi.typeof('$[?]', ffi.typeof(b.ctype)), b.size)
+		return ffi.new(ffi.typeof('$[?]', ffi.typeof(b.ctype)), size)
 	end
 	b.data = b.data or b:alloc(b.size)
 
@@ -101,15 +101,20 @@ local function cdatabuffer(b) --ring buffer for uniform cdata values
 		return i1 - 1, n1, i2 - 1, n2 --count from 0
 	end
 
+	function b:checksize(len)
+		if len <= b.size - b.length then return end
+		local newsize = max(b.size * 2, b.length + len)
+		local newdata = b:alloc(newsize)
+		local i1, n1, i2, n2 = normalize_segs(segments(b.start + 1, b.length, b.size))
+		ffi.copy(newdata,      b.data + i1, n1)
+		ffi.copy(newdata + n1, b.data + i2, n2)
+		b.data, b.size, b.start = newdata, newsize, 0
+	end
+
 	function b:push(data, len)
 		len = len or 1
-		if b.autogrow and b.length == b.size then
-			local i1, n1, i2, n2 = normalize_segs(segments(b.start + 1, b.length, b.size))
-			local newsize = b.size * 2
-			local newdata = b:alloc(newsize)
-			ffi.copy(newdata,      b.data + i1, n1)
-			ffi.copy(newdata + n1, b.data + i2, n2)
-			b.data, b.size, b.start = newdata, newsize, 0
+		if b.autogrow then
+			b:checksize(len)
 		end
 		local start, length, i1, n1, i2, n2 = push(len, b.start + 1, b.length, b.size)
 		b.start, b.length = start - 1, length --count from 0
@@ -155,26 +160,31 @@ local function valuebuffer(b) --ring buffer for arbitrary Lua values
 		return sign
 	end
 
+	function b:checksize(len)
+		if len <= b.size - b.length then return end
+		local newsize = max(b.size * 2, b.length + len)
+		local i1, n1, i2, n2 = segments(b.start, b.length, b.size)
+		if n1 > n2 then --move segment 2 right after segment 1
+			local o = i1 + n1 - 1
+			for i = 1, n2 do
+				b.data[o + i] = b.data[i]
+				b.data[i] = false --keep the slot
+			end
+		else --move segment 1 to the end of the new buffer
+			local o = newsize - n1 + 1
+			for i = 0, n1-1 do
+				b.data[o + i] = b.data[i1 + i]
+				b.data[i1 + i] = false --keep the slot
+			end
+			b.start = o
+		end
+		b.size = newsize
+	end
+
 	function b:push(val, sign)
 		sign = checksign(sign)
-		if b.autogrow and b.length == b.size then
-			local newsize = b.size * 2
-			local i1, n1, i2, n2 = segments(b.start, b.length, b.size)
-			if n1 > n2 then --move segment 2 right after segment 1
-				local o = i1 + n1 - 1
-				for i = 1, n2 do
-					b.data[o + i] = b.data[i]
-					b.data[i] = false --keep the slot
-				end
-			else --move segment 1 to the end of the new buffer
-				local o = newsize - n1 + 1
-				for i = 0, n1-1 do
-					b.data[o + i] = b.data[i1 + i]
-					b.data[i1 + i] = false --keep the slot
-				end
-				b.start = o
-			end
-			b.size = newsize
+		if b.autogrow then
+			b:checksize(1)
 		end
 		local i
 		b.start, b.length, i = push(sign, b.start, b.length, b.size)
