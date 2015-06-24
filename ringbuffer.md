@@ -61,6 +61,7 @@ b.autogrow -> true | false                                   enable auto-growing
   * algorithm indices start at 1.
   * valuebuffer indices start at 1.
   * cdatabuffer indices start at 0.
+  * 'keep' means read but don't remove the data.
 
 ## CData buffers
 
