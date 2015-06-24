@@ -1,5 +1,5 @@
 ---
-tagline: ring buffers
+tagline: bidirectional ring buffers
 ---
 
 ## `local rb = require'ringbuffer'`
@@ -14,7 +14,7 @@ Two actual data structures are implemented with this API:
 
 For both kinds of buffers:
 
-  * elements can be added/removed at both ends of the buffer.
+  * elements can be added/removed at both ends of the buffer (LIFO/FIFO).
   * the buffer can be fixed-size or auto-growing.
   * can work with an external, pre-allocated buffer.
 
