@@ -22,35 +22,35 @@ __NOTE:__ This module can be used with plain Lua but cdatabuffer won't work.
 
 ## API
 
------------------------------------------------------------ -----------------------------------------------------
+-------------------------------------------------------------- -----------------------------------------------------
 __algorithm__
-`rb.segments(start, len, size) -> segs...`                  buffer's occupied segments
-`rb.free_segments(start, len, size) -> segs...`             buffer's free segments
-`rb.offset(ofs, start, len, size) -> i`                     index at offset from head (or tail+1 if ofs < 0)
-`rb.push(len, start, len, size) -> start, len, segs...`     push len elements to tail (or head if len < 0)
-`rb.pull(len, start, len, size) -> start, len, segs...`     pull len elements from head (or tail if len < 0)
+`rb.segments(start, length, size) -> segs...`                  buffer's occupied segments
+`rb.free_segments(start, length, size) -> segs...`             buffer's free segments
+`rb.offset(ofs, start, length, size) -> i`                     index at offset from head (or tail+1 if ofs < 0)
+`rb.push(len, start, length, size) -> start, length, segs...`  push len elements to tail (or head if len < 0)
+`rb.pull(len, start, length, size) -> start, length, segs...`  pull len elements from head (or tail if len < 0)
 __cdata buffers__
-`rb.cdatabuffer(db) -> db`                                  create a buffer for specific cdata values
-`db:push(src[, len]) -> segs...`                            add data to tail (or head if len < 0)
-`db:pull(dst[, len][, 'keep']) -> segs...`                  remove data from head (or tail if len < 0)
-`db:checksize(len)`                                         grow the buffer to fit at least `len` more elements
-`db:offset([ofs]) -> i`                                     offset from head (or from tail+1 if ofs < 0)
-`db.data -> cdata`                                          the buffer itself
-`db:alloc(len) -> cdata`                                    allocator (defaults to ffi.new)
-`db:read(dst, src, len)`                                    segment reader (defaults to ffi.copy)
-`db:write(dst, src, len)`                                   segment writer (defaults to ffi.copy)
+`rb.cdatabuffer(db) -> db`                                     create a buffer for specific cdata values
+`db:push(src[, len]) -> segs...`                               add data to tail (or head if len < 0)
+`db:pull(dst[, len][, 'keep']) -> segs...`                     remove data from head (or tail if len < 0)
+`db:checksize(len)`                                            grow the buffer to fit at least `len` more elements
+`db:offset([ofs]) -> i`                                        offset from head (or from tail+1 if ofs < 0)
+`db.data -> cdata`                                             the buffer itself
+`db:alloc(len) -> cdata`                                       allocator (defaults to ffi.new)
+`db:read(dst, src, len)`                                       segment reader (defaults to ffi.copy)
+`db:write(dst, src, len)`                                      segment writer (defaults to ffi.copy)
 __value buffers__
-`rb.valuebuffer(vb) -> vb`                                  create a buffer for arbitrary Lua values
-`vb:push(val[, sign]) -> i`                                 add value to tail (or head if sign = -1)
-`vb:pull([sign][, 'keep']) -> val, i`                       remove value from head (or tail if sign = -1)
-`vb:checksize(len)`                                         grow the buffer to fit at least `len` more elements
-`vb:offset([ofs]) -> i`                                     get index at head+ofs (or tail+1+ofs if ofs < 0)
-`vb.data -> t`                                              the buffer itself
+`rb.valuebuffer(vb) -> vb`                                     create a buffer for arbitrary Lua values
+`vb:push(val[, sign]) -> i`                                    add value to tail (or head if sign = -1)
+`vb:pull([sign][, 'keep']) -> val, i`                          remove value from head (or tail if sign = -1)
+`vb:checksize(len)`                                            grow the buffer to fit at least `len` more elements
+`vb:offset([ofs]) -> i`                                        get index at head+ofs (or tail+1+ofs if ofs < 0)
+`vb.data -> t`                                                 the buffer itself
 __buffer state__
-`b.start -> i`                                              start index
-`b.size -> n`                                               buffer size
-`b.length -> n`                                             buffer occupied size
-`b.autogrow -> true | false`                                enable auto-growing when running out of space
+`b.start -> i`                                                 start index
+`b.size -> n`                                                  buffer size
+`b.length -> n`                                                buffer occupied size
+`b.autogrow -> true | false`                                   enable auto-growing when running out of space
 -------------------------------------------------------------- -----------------------------------------------------
 
 ## API Notes
