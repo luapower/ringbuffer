@@ -42,14 +42,13 @@ end
 
 local function push(len, start, length, size)
 	assert(abs(len) <= size - length, 'buffer overflow')
+	local newlength = length + abs(len)
 	if len > 0 then --add len forwards from tail+1
 		local i1, n1, i2, n2 = segments(start + length, len, size)
-		local newlength = length + n1 + n2
 		return start, newlength, i1, n1, i2, n2
 	elseif len < 0 then --add len backwards from head-1
 		local i1, n1, i2, n2 = segments(start - 1, len, size)
 		local newstart = normalize(start + len, size)
-		local newlength = length - n1 - n2 --n1 and n2 are negative!
 		return newstart, newlength, i1, n1, i2, n2
 	else
 		return start, length, 1, 0, 1, 0
@@ -58,14 +57,13 @@ end
 
 local function pull(len, start, length, size)
 	assert(abs(len) <= length, 'buffer underflow')
+	local newlength = length - abs(len)
 	if len > 0 then --remove len from head
 		local i1, n1, i2, n2 = segments(start, len, size)
 		local newstart = normalize(start + len, size)
-		local newlength = length - n1 - n2
 		return newstart, newlength, i1, n1, i2, n2
 	elseif len < 0 then --remove len from tail
 		local i1, n1, i2, n2 = segments(start + length - 1, len, size)
-		local newlength = length + n1 + n2 --n1 and n2 are negative!
 		return start, newlength, i1, n1, i2, n2
 	else
 		return start, length, 1, 0, 1, 0
@@ -86,8 +84,12 @@ local function cdatabuffer(b) --ring buffer for uniform cdata values
 		return ffi.new(ffi.typeof('$[?]', ffi.typeof(b.ctype)), size)
 	end
 	b.data = b.data or b:alloc(b.size)
-	b.write = b.write or function(self, dst, src, len) ffi.copy(dst, src, len) end
-	b.read  = b.read  or function(self, dst, src, len) ffi.copy(dst, src, len) end
+	b.write = b.write or function(self, len, dst, dofs, src, sofs)
+		ffi.copy(dst + dofs, src + sofs, len)
+	end
+	b.read  = b.read  or function(self, len, dst, dofs, src, sofs)
+		ffi.copy(dst + dofs, src + sofs, len)
+	end
 
 	local function normalize_segs(i1, n1, i2, n2)
 		if n1 < 0 then --invert direction of negative-size segments
@@ -115,8 +117,8 @@ local function cdatabuffer(b) --ring buffer for uniform cdata values
 		local start, length, i1, n1, i2, n2 = push(len, b.start + 1, b.length, b.size)
 		b.start, b.length = start - 1, length --count from 0
 		i1, n1, i2, n2 = normalize_segs(i1, n1, i2, n2)
-		if n1 ~= 0 then b:write(b.data + i1, src,      n1) end
-		if n2 ~= 0 then b:write(b.data + i2, src + n1, n2) end
+		if n1 ~= 0 then b:write(n1, b.data, i1, src,  0) end
+		if n2 ~= 0 then b:write(n2, b.data, i2, src, n1) end
 		return i1, n1, i2, n2
 	end
 
@@ -127,8 +129,8 @@ local function cdatabuffer(b) --ring buffer for uniform cdata values
 			b.start, b.length = start - 1, length --count from 0
 		end
 		i1, n1, i2, n2 = normalize_segs(i1, n1, i2, n2)
-		if n1 ~= 0 then b:read(dst,      b.data + i1, n1) end
-		if n2 ~= 0 then b:read(dst + n1, b.data + i2, n2) end
+		if n1 ~= 0 then b:read(n1, dst,  0, b.data, i1) end
+		if n2 ~= 0 then b:read(n2, dst, n1, b.data, i2) end
 		return i1, n1, i2, n2
 	end
 

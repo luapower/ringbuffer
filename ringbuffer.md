@@ -37,8 +37,8 @@ __cdata buffers__
 `db:offset([ofs]) -> i`                                        offset from head (or from tail+1 if ofs < 0)
 `db.data -> cdata`                                             the buffer itself
 `db:alloc(len) -> cdata`                                       allocator (defaults to ffi.new)
-`db:read(dst, src, len)`                                       segment reader (defaults to ffi.copy)
-`db:write(dst, src, len)`                                      segment writer (defaults to ffi.copy)
+`db:read(len, dst, dofs, src, sofs)`                           segment reader (defaults to ffi.copy)
+`db:write(len, dst, dofs, src, sofs)`                          segment writer (defaults to ffi.copy)
 __value buffers__
 `rb.valuebuffer(vb) -> vb`                                     create a buffer for arbitrary Lua values
 `vb:push(val[, sign]) -> i`                                    add value to tail (or head if sign = -1)
