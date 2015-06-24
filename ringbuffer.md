@@ -55,11 +55,12 @@ b.autogrow -> true | false                                   enable auto-growing
 
 ## API Notes
 
-  * valuebuffer indices start at 1.
-  * cdatabuffer indices start at 0.
   * `segs...` means `index1, length1, index2, length2`;
   length2 can be 0 when the result is only one segment;
   length1 can be 0 only when the input length is 0.
+  * algorithm indices start at 1.
+  * valuebuffer indices start at 1.
+  * cdatabuffer indices start at 0.
 
 ## CData buffers
 
