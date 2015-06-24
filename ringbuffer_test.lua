@@ -26,24 +26,24 @@ local function _(i, j)
 	assert((db.start + db.length - 1) % db.size == j - 1)
 end
 local function nstr(n)
-	local b = ffi.new('char[?]', n)
+	local b = ffi.new('char[?]', math.abs(n))
 	for i=0,n-1 do b[i] = string.byte('A')+i end
 	return b, n
 end
 db:push(nstr(3)) _(1,3)
 db:push(nstr(5)) _(1,8)
-db:pull(3)       _(4,8)
-db:pull(-3)      _(4,5)
+db:pull(nstr(3)) _(4,8)
+db:pull(nstr(-3))_(4,5)
 db:push(nstr(3)) _(4,8)
 db:push(nstr(5)) _(4,3) --(right overflow)
-db:pull(2)       _(6,3)
-db:pull(-4)      _(6,9) --(left underflow)
+db:pull(nstr(2)) _(6,3)
+db:pull(nstr(-4))_(6,9) --(left underflow)
 db:push(nstr(6)) _(6,5) --(right overflow)
 assert(db.length == 10)
-db:pull(8)       _(4,5) --(right underflow)
+db:pull(nstr(8)) _(4,5) --(right underflow)
 assert(db.length == 2)
 db:push(nstr(8)) _(4,3) --(right overflow)
-db:pull(0) --nop
+db:pull(nstr(1), 0) --nop
 db:push(nstr(1), 0) --nop
 assert(db.length == 10)
 assert(not pcall(db.push, db, nstr(1)))
