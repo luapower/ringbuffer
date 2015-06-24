@@ -1,5 +1,5 @@
 
--- FIFO/LIFO ring buffers represented as (start, length, size) tuples.
+-- bidirectional ring buffers represented as (start, length, size) tuples.
 -- Written by Cosmin Apreutesei. Public Domain.
 
 if not ... then require'ringbuffer_test'; return end
