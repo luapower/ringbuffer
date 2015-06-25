@@ -53,7 +53,7 @@ __buffer state__
 `b.autogrow -> true | false`                                   enable auto-growing when running out of space
 -------------------------------------------------------------- -----------------------------------------------------
 
-## API Notes
+__API Notes:__
 
   * `segs...` means `index1, length1, index2, length2`;
   length2 can be 0 when the result is only one segment;
