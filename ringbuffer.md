@@ -58,7 +58,7 @@ __API Notes:__
 Cdata buffers apply the ring buffer algorithm to a cdata array.
 When `push()` is called with a `data` arg, the `write()` method is called
 once or twice with the segments to be written from `data` into the buffer.
-When `pop()` is called with a `data` arg, the `read()` method is called once
+When `pull()` is called with a `data` arg, the `read()` method is called once
 or twice with the segments to be read from the buffer into `data`.
 
 > __NOTE:__ A cdatabuffer doesn't have to manage an actual buffer. Instead,
