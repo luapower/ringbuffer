@@ -2,7 +2,7 @@
 tagline: bidirectional ring buffers
 ---
 
-## `local rb = require'ringbuffer'`
+## `local rb = require'ringbuffer2'`
 
 The ring buffer algorithm is provided as an API operating on an abstract
 buffer state defined as the tuple `(start, length, size)` where `start` is
