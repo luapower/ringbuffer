@@ -67,7 +67,7 @@ can be applied to. To do this pass `data = true` when creating a buffer
 to avoid allocating an actual buffer. Call `push()` and `pull()` without
 a `data` arg to avoid calls to `write()` and `read()` and use the buffer
 state variables `start`, `length` and `size` as you want. Or, pass `true`
-to the `data` when calling `push()` and `pull()` and override `read()`
+to the `data` arg in `push()` and `pull()` and override `read()`
 and `write()` to do the actual moving of data.
 
 ### `rb.cdatabuffer(cb) -> cb`
