@@ -55,9 +55,20 @@ __API Notes:__
 
 ## Cdata buffers
 
-Cdata buffers manage a cdata array. When pushing and pulling, if a
-`data` arg is passed, the write() and respectiely the read() methods are
-called once or twice.
+Cdata buffers apply the ring buffer algorithm to a cdata array.
+When `push()` is called with a `data` arg, the `write()` method is called
+once or twice with the segments to be written from `data` into the buffer.
+When `pop()` is called with a `data` arg, the `read()` method is called once
+or twice with the segments to be read from the buffer into `data`.
+
+> __NOTE:__ A cdatabuffer doesn't have to manage an actual buffer. Instead,
+it can be used to manage an external resource that the ring buffer logic
+can be applied to. To do this pass `data = true` when creating a buffer
+to avoid allocating an actual buffer. Call `push()` and `pull()` without
+a `data` arg to avoid calls to `write()` and `read()` and use the buffer
+state variables `start`, `length` and `size` as you want. Or, pass `true`
+to the `data` when calling `push()` and `pull()` and override `read()`
+and `write()` to do the actual moving of data.
 
 ### `rb.cdatabuffer(cb) -> cb`
 
