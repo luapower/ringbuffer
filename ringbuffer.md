@@ -1,82 +1,72 @@
 ---
-tagline: bidirectional ring buffers
+tagline: unidirectional ring buffers
 ---
 
-## `local rb = require'ringbuffer2'`
+## `local rb = require'ringbuffer'`
 
-The ring buffer algorithm is provided as an API operating on an abstract
-buffer state defined as the tuple `(start, length, size)` where `start` is
-in the `[1, size]` interval and `length` is in the `[0, size]` interval.
-Two actual data structures are implemented with this API:
+Two actual data structures are implemented:
 
   * a cdata array buffer, which supports adding/removing elements in bulk.
-  * a Lua array buffer, which can hold arbitrary Lua values.
+  * a Lua array buffer, which can hold arbitrary Lua values which can be
+  added/removed one by one.
 
 For both kinds of buffers:
 
-  * elements can be added/removed at both ends of the buffer (LIFO/FIFO).
-  * the buffer can be fixed-size or auto-growing.
-  * can work with an external, pre-allocated buffer.
+  * data can only be added to the tail and removed from the head (FIFO).
+  * the buffer is fixed-size and can grow on request.
+  * can work with an external buffer or can allocate one internally.
 
-__NOTE:__ This module can be used with plain Lua but cdatabuffer won't work.
+> __NOTE:__ This module can be used with Lua 5.1 but cdatabuffer won't work.
 
 ## API
 
 -------------------------------------------------------------- -----------------------------------------------------
-__algorithm__
-`rb.segments(start, length, size) -> segs...`                  buffer's occupied segments
-`rb.free_segments(start, length, size) -> segs...`             buffer's free segments
-`rb.offset(ofs, start, length, size) -> i`                     index at offset from head (or tail+1 if ofs < 0)
-`rb.push(len, start, length, size) -> start, length, segs...`  push len elements to tail (or head if len < 0)
-`rb.pull(len, start, length, size) -> start, length, segs...`  pull len elements from head (or tail if len < 0)
 __cdata buffers__
-`rb.cdatabuffer(db) -> db`                                     create a buffer for specific cdata values
-`db:push(src[, len]) -> segs...`                               add data to tail (or head if len < 0)
-`db:pull(dst[, len][, 'keep']) -> segs...`                     remove data from head (or tail if len < 0)
-`db:checksize(len)`                                            grow the buffer to fit at least `len` more elements
-`db:offset([ofs]) -> i`                                        offset from head (or from tail+1 if ofs < 0)
-`db.data -> cdata`                                             the buffer itself
-`db:alloc(len) -> cdata`                                       allocator (defaults to ffi.new)
-`db:read(len, dst, dofs, src, sofs)`                           segment reader (defaults to ffi.copy)
-`db:write(len, dst, dofs, src, sofs)`                          segment writer (defaults to ffi.copy)
+`rb.cdatabuffer(cb) -> cb`                                     create a cdata buffer
+`cb:head(i) -> i`                                              normalized offset from head
+`cb:tail(i) -> i`                                              normalized offset from tail
+`cb:segments() -> i1, n1, i2, n2`                              offsets and sizes of buffer's occupied segments
+`cb:free_segments() -> i1, n1, i2, n2`                         offsets and sizes of buffer's free segments
+`cb:push(n[, data]) -> i1, n1, i2, n2`                         add data to tail, invoking cb:read()
+`cb:pull(n[, data]) -> i1, n1, i2, n2`                         remove data from head, invoking cb:write()
+`cb:checksize(n)`                                              grow the buffer to fit at least `n` more elements
+`cb:alloc(n) -> cdata`                                         allocator (defaults to ffi.new)
+`cb:read(n, dst, di, src, si)`                                 segment reader (defaults to ffi.copy)
+`cb:write(n, dst, di, src, si)`                                segment writer (defaults to ffi.copy)
+`cb.data -> cdata`                                             the buffer itself
 __value buffers__
 `rb.valuebuffer(vb) -> vb`                                     create a buffer for arbitrary Lua values
-`vb:push(val[, sign]) -> i`                                    add value to tail (or head if sign = -1)
-`vb:pull([sign][, 'keep']) -> val, i`                          remove value from head (or tail if sign = -1)
-`vb:checksize(len)`                                            grow the buffer to fit at least `len` more elements
-`vb:offset([ofs]) -> i`                                        get index at head+ofs (or tail+1+ofs if ofs < 0)
-`vb.data -> t`                                                 the buffer itself
+`vb:head(i) -> i`                                              normalized offset from head
+`vb:tail(i) -> i`                                              normalized offset from tail
+`vb:push(v) -> i`                                              add value to tail
+`vb:pull() -> v`                                               remove value from head
+`vb:checksize(n)`                                              grow the buffer to fit at least `n` more elements
+`vb.data -> t`                                                 the buffer itself (a Lua table)
 __buffer state__
 `b.start -> i`                                                 start index
-`b.size -> n`                                                  buffer size
-`b.length -> n`                                                buffer occupied size
-`b.autogrow -> true | false`                                   enable auto-growing when running out of space
+`b.size -> n`                                                  capacity
+`b.length -> n`                                                occupied size
 -------------------------------------------------------------- -----------------------------------------------------
 
 __API Notes:__
 
-  * `segs...` means `index1, length1, index2, length2`;
-  length2 can be 0 when the result is only one segment;
-  length1 can be 0 only when the input length is 0.
-  * algorithm indices start at 1.
-  * valuebuffer indices start at 1.
   * cdatabuffer indices start at 0.
-  * 'keep' means read but don't remove the data.
+  * valuebuffer indices start at 1.
 
-## CData buffers
+## Cdata buffers
 
-CData buffers manage a cdata array. Pushing and pulling data results
-in multiple calls to write() and read() respectively.
+Cdata buffers manage a cdata array. When pushing and pulling, if a
+`data` arg is passed, the write() and respectiely the read() methods are
+called once or twice.
 
-### `rb.cdatabuffer(db) -> db`
+### `rb.cdatabuffer(cb) -> cb`
 
-  * db is a table providing:
+  * cb is a table providing:
     * `size`: the size of the buffer.
     * `data` or `ctype`: the pre-allocated buffer, or the element type
-    in which case a ctype[size] buffer will be allocated.
+    in which case a `ctype[size]` buffer will be allocated.
     * `start`, `length`: optional, if the buffer comes pre-filled.
-    * `alloc`: optional custom allocator, for initial allocation and auto-growing.
-    * `autogrow`: enable auto-growing.
+    * `alloc`: optional custom allocator, for initial allocation and growing.
 
 ## Value buffers
 
@@ -88,4 +78,3 @@ For simplicity, values can only be added and removed one by one.
   * vb is a table providing:
     * `size`: the size of the buffer.
     * `data`, `start`, `length`: optional, if the buffer comes pre-filled.
-    * `autogrow`: enable auto-growing.
