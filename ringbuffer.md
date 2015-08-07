@@ -42,14 +42,14 @@ Convert an initial table to a ring buffer and return it. The table can have fiel
   * `start`, `length`: optional, in case the buffer comes pre-filled.
   * `alloc`: optional custom allocator, for initial allocation and growing.
 
-### How it works
+## How it works
 
 When `push()` is called with a `data` arg, the `write()` method is called
 once or twice with the segments to be written from `data` into the buffer.
 When `pull()` is called with a `data` arg, the `read()` method is called once
 or twice with the segments to be read from the buffer into `data`.
 
-### As an interface
+## As an interface
 
 A cdatabuffer doesn't have to manage an actual buffer. Instead,
 it can be used to manage an external resource that the ring buffer logic
