@@ -36,11 +36,11 @@ Unidirectional cdata array-based ring buffers with the following properties:
 
 Convert an initial table to a ring buffer and return it. The table can have fields:
 
-    * `size`: the size of the buffer.
-    * `ctype`: the element type for allocating an internal buffer, or
-    * `data`: a pre-allocated buffer.
-	 * `start`, `length`: optional, in case the buffer comes pre-filled.
-    * `alloc`: optional custom allocator, for initial allocation and growing.
+  * `size`: the size of the buffer.
+  * `ctype`: the element type for allocating an internal buffer, or
+  * `data`: a pre-allocated buffer.
+  * `start`, `length`: optional, in case the buffer comes pre-filled.
+  * `alloc`: optional custom allocator, for initial allocation and growing.
 
 ### How it works
 
