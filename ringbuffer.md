@@ -51,7 +51,7 @@ or twice with the segments to be read from the buffer into `data`.
 
 ## As an interface
 
-A cdatabuffer doesn't have to manage an actual buffer. Instead,
+A ring buffer doesn't have to manage an actual buffer. Instead,
 it can be used to manage an external resource that the ring buffer logic
 can be applied to. To do this pass `data = true` when creating a buffer
 to avoid allocating an actual buffer. Call `push()` and `pull()` without
