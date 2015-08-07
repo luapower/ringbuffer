@@ -1,21 +1,21 @@
-local rb = require'ringbuffer'
+local ringbuffer = require'ringbuffer'
 local ffi = require'ffi'
 local rand = math.random
 
 io.stdout:setvbuf'no'
 math.randomseed(os.time())
 
-local b = rb.cbuffer{ctype = 'char', size = 5, read = function() end}
+local b = ringbuffer{ctype = 'char', size = 5, read = function() end}
 
 local function randstr(n)
 	return string.char(rand(('A'):byte(), ('Z'):byte())):rep(n)
 end
 
-for i = 0, b.last do
+for i = 0, b.size-1 do
 	b.data[i] = string.byte('.')
 end
 
-for i = 1, 15 do
+for i = 1, 30 do
 	local cmd, s, n
 	::cont::
 	if rand() > .5 then
@@ -40,3 +40,4 @@ for i = 1, 15 do
 	local i1, n1, i2, n2 = b:segments()
 	print(string.format('%s %s %3d: %2d+%2d, %2d+%2d  %s', ds, cmd, n, i1, n1, i2, n2, s or ''))
 end
+
