@@ -103,16 +103,15 @@ function cbuf:alloc(size)
 	return ffi.new(actype, size)
 end
 
-local function buffer(self)
+function cbuf.new(super, self)
 	assert(self.size, 'size required')
 	self.ctype  = ffi.typeof(self.ctype or 'char')
 	self.bctype = ffi.typeof('$*', self.ctype)
 	self.start  = self.start or 0
 	self.length = self.length or 0
 	self.offset = offset_func(self.size)
-	for k,v in pairs(cbuf) do --copy all methods
-		self[k] = v
-	end
+	self.__index = super
+	setmetatable(self, self)
 	if self.data then
 		self._data = self.data --pin it!
 		self.data = ffi.cast(self.bctype, self.data)
@@ -122,4 +121,10 @@ local function buffer(self)
 	return self
 end
 
-return buffer
+setmetatable(cbuf, cbuf)
+
+function cbuf:__call(...)
+	return self:new(...)
+end
+
+return cbuf

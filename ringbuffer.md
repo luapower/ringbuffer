@@ -59,3 +59,8 @@ a `data` arg to avoid calls to `write()` and `read()` and use the buffer
 state variables `start`, `length` and `size` as you want. Or, pass `true`
 (or any other value) to the `data` arg in `push()` and `pull()` and
 override `read()` and `write()` to do the actual moving of data.
+
+## Extending
+
+The ringbuffer function is actually a callable table which can be copied
+or inherited from and patched to create custom buffer classes.
