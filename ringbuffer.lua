@@ -122,9 +122,6 @@ function cbuf.new(super, self)
 end
 
 setmetatable(cbuf, cbuf)
-
-function cbuf:__call(...)
-	return self:new(...)
-end
+cbuf.__call = cbuf.new
 
 return cbuf
